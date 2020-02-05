@@ -69,7 +69,7 @@ def Get_Teams(url):
            'Calgary Flames': 'CGY', 'Carolina Hurricanes': 'CAR', 'Chicago Blackhawks': 'CHI', 'Colorado Avalanche': 'COL',
            'Columbus Blue Jackets': 'CBJ', 'Dallas Stars': 'DAL', 'Detroit Red Wings': 'DET', 'Edmonton Oilers': 'EDM',
            'Florida Panthers': 'FLA', 'Los Angeles Kings': 'LAK', 'Minnesota Wild': 'MIN', 'Montréal Canadiens': 'MTL',
-           'Nashville Predators': 'NSH', 'New Jersey Devils': 'NJD', 'New York Islanders': 'NYI', 'New York Rangers': 'NYI',
+           'Nashville Predators': 'NSH', 'New Jersey Devils': 'NJD', 'New York Islanders': 'NYI', 'New York Rangers': 'NYR',
            'Ottawa Senators': 'OTT', 'Philadelphia Flyers': 'PHI', 'Pittsburgh Penguins': 'PIT', 'San Jose Sharks': 'SJS',
            'St. Louis Blues': 'STL', 'Tampa Bay Lightning': 'TBL', 'Toronto Maple Leafs': 'TOR', 'Vancouver Canucks': 'VAN',
            'Vegas Golden Knights': 'VEG', 'Washington Capitals': 'WSH', 'Winnipeg Jets': 'WPG'}
@@ -95,9 +95,14 @@ def Get_Teams(url):
 
                 team_cities = division.findAll('a', {'class': 'team-city'})
 
-                for team_city in team_cities[:-1]: # exclude Seattle (for now)
-
+                for team_city in team_cities: 
+                    
                     city = team_city.find('span').text.strip()
+                    
+                    if city.startswith('Seattle'):
+                        
+                        break
+                        
                     name = team_city.find('span').findNext('span').text.strip()
 
                     abbreviation = mapping[city + ' ' + name]
