@@ -1,20 +1,19 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# # Teams
+# # teams-api
 
-# Get List of NHL Teams, including Conferences and Divisions and populates SQL Server.
+# Use NHL API to get franchise info
 
 # ## Imports
 
 # In[1]:
 
 
-import sys
-import pandas as pd
 import pyodbc
 import requests
-from bs4 import BeautifulSoup
+import json
+import pandas as pd
 
 
 # ## Functions
@@ -59,70 +58,43 @@ def Connect_DB(database):
 # In[3]:
 
 
-def Get_Teams(url):
+def Get_Teams():
 
     """
-    Scrapes url for Conference, Division, Team. Returns list of teams.
+    API requests and processes Franchise info
     """
 
-    mapping = {'Anaheim Ducks': 'ANA', 'Arizona Coyotes': 'ARI', 'Boston Bruins': 'BOS', 'Buffalo Sabres': 'BUF',
-           'Calgary Flames': 'CGY', 'Carolina Hurricanes': 'CAR', 'Chicago Blackhawks': 'CHI', 'Colorado Avalanche': 'COL',
-           'Columbus Blue Jackets': 'CBJ', 'Dallas Stars': 'DAL', 'Detroit Red Wings': 'DET', 'Edmonton Oilers': 'EDM',
-           'Florida Panthers': 'FLA', 'Los Angeles Kings': 'LAK', 'Minnesota Wild': 'MIN', 'Montréal Canadiens': 'MTL',
-           'Nashville Predators': 'NSH', 'New Jersey Devils': 'NJD', 'New York Islanders': 'NYI', 'New York Rangers': 'NYR',
-           'Ottawa Senators': 'OTT', 'Philadelphia Flyers': 'PHI', 'Pittsburgh Penguins': 'PIT', 'San Jose Sharks': 'SJS',
-           'St. Louis Blues': 'STL', 'Tampa Bay Lightning': 'TBL', 'Toronto Maple Leafs': 'TOR', 'Vancouver Canucks': 'VAN',
-           'Vegas Golden Knights': 'VEG', 'Washington Capitals': 'WSH', 'Winnipeg Jets': 'WPG'}
+    page = requests.get('https://statsapi.web.nhl.com/api/v1/teams')
 
-    try:
+    data = json.loads(page.content)['teams']
 
-        page = requests.get(url)
-        soup = BeautifulSoup(page.content, 'html.parser')
+    teams = []
 
-        conferences = soup.findAll('section', {'class': 'conference'})
+    for i in range(len(data)):
 
-        teams = list()
+        team_id = data[i]['id']
+        franchise = data[i]['name']
+        abbreviation = data[i]['abbreviation']
+        division = data[i]['division']['name']
+        conference = data[i]['conference']['name']
+        city = data[i]['locationName']
+        name = data[i]['teamName']
+        location = data[i]['venue']['city']
+        venue = data[i]['venue']['name']
+        tz = data[i]['venue']['timeZone']['tz']
+        offset = data[i]['venue']['timeZone']['offset']
+        firstYearOfPlay = data[i]['firstYearOfPlay']
+        url = data[i]['officialSiteUrl']
 
-        for conference in conferences:
+        teams.append((team_id, franchise, abbreviation, division, conference, city, name, location, venue, tz, offset, url, firstYearOfPlay))
 
-            conf = conference.h2.text.replace('Conference', '').strip()
-
-            divisions = conference.findAll('div', {'class': 'division'})
-
-            for division in divisions:
-
-                div = division.h3.text.replace('Division', '').strip()
-
-                team_cities = division.findAll('a', {'class': 'team-city'})
-
-                for team_city in team_cities: 
-                    
-                    city = team_city.find('span').text.strip()
-                    
-                    if city.startswith('Seattle'):
-                        
-                        break
-                        
-                    name = team_city.find('span').findNext('span').text.strip()
-
-                    abbreviation = mapping[city + ' ' + name]
-
-                    listing = (city + ' ' + name, abbreviation, conf, div)
-
-                    teams.append(listing)
-
-        return teams
-
-    except Exception as e:
-
-        print ('Error: {}'.format(e))
-        sys.exit(1)
+    return teams
 
 
 # In[4]:
 
 
-def Save_Data_to_Teams(teams):
+def Save_Teams(teams):
 
     """
     Delete table Teams and load teams into it.
@@ -136,10 +108,7 @@ def Save_Data_to_Teams(teams):
 
             cursor.execute("DROP TABLE Teams")        
 
-        query = """CREATE TABLE Teams (                     team varchar(50) PRIMARY KEY NOT NULL, 
-                    abbreviation char(3) NOT NULL, \
-                    conference varchar(50) NOT NULL, \
-                    division varchar(50) NOT NULL)"""
+        query = """CREATE TABLE Teams (                     team_id int PRIMARY KEY NOT NULL,                     franchise varchar(50) NOT NULL,                     abbreviation char(3) NOT NULL,                     division varchar(50) NOT NULL,                     conference varchar(50) NOT NULL,                     city varchar(50) NOT NULL,                     name varchar(50) NOT NULL,                     location varchar(50) NOT NULL,                     venue varchar(50) NOT NULL,                     tz char(3) NOT NULL,                     offset int NOT NULL,                     url varchar(100) NOT NULL,                     firstYearOfPlay int NOT NULL)"""
 
         cursor.execute(query)
 
@@ -151,7 +120,7 @@ def Save_Data_to_Teams(teams):
     try:
 
         cnxn.autocommit = False
-        cursor.executemany("INSERT INTO Teams(team, abbreviation, conference, division) VALUES (?, ?, ?, ?)", teams)
+        cursor.executemany("INSERT INTO Teams (team_id, franchise, abbreviation, division, conference, city, name, location, venue, tz, offset, url, firstYearOfPlay) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", teams)
 
     except Exception as e:
 
@@ -176,9 +145,7 @@ if __name__ == '__main__':
 
     cnxn = Connect_DB('NHL')
 
-    url = pd.read_sql("SELECT [url] FROM URLs WHERE [use] = 'teams'", cnxn).values[0][0]
+    teams = Get_Teams()
 
-    teams = Get_Teams(url)
-
-    Save_Data_to_Teams(teams)
+    Save_Teams(teams)
 
